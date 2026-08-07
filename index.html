@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>All-In Crescendo</title>
+
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+</head>
+
+<body>
+
+    <div
+        class="screen-flash"
+        id="screenFlash"
+    ></div>
+
+    <div
+        class="game-shell"
+        id="gameShell"
+    >
+
+        <!-- =========================
+             LEFT: CASINO
+        ========================== -->
+
+        <aside class="dashboard casino-panel">
+
+            <div class="panel-heading">
+                <span class="panel-eyebrow">
+                    YOUR EMPIRE
+                </span>
+
+                <h2>Casino</h2>
+            </div>
+
+            <div class="main-chip-display">
+                <span class="chip-label">
+                    CHIPS
+                </span>
+
+                <strong id="chips">
+                    100
+                </strong>
+            </div>
+
+            <div class="casino-income-line">
+                <span>
+                    Passive Income
+                </span>
+
+                <strong>
+                    <span id="idleIncome">
+                        1.0
+                    </span>
+                    / sec
+                </strong>
+            </div>
+
+            <hr>
+
+            <h3>
+                Casino Empire
+            </h3>
+
+            <div class="upgrade-list">
+                <!-- Filled automatically by JS -->
+            </div>
+
+        </aside>
+
+
+        <!-- =========================
+             CENTER: RHYTHM GAME
+        ========================== -->
+
+        <main class="rhythm-center">
+
+            <div class="rhythm-header">
+
+                <div>
+                    <span class="panel-eyebrow">
+                        ACTIVE GAME
+                    </span>
+
+                    <h1>
+                        All-In Crescendo
+                    </h1>
+                </div>
+
+                <div class="controls-mini">
+                    <span>D</span>
+                    <span>F</span>
+                    <span>J</span>
+                    <span>K</span>
+                </div>
+
+            </div>
+
+
+            <!-- Jackpot is injected here -->
+
+
+            <div class="performance-hud">
+
+                <div
+                    class="combo-card"
+                    id="comboCard"
+                >
+
+                    <span class="hud-label">
+                        COMBO
+                    </span>
+
+                    <strong id="comboDisplay">
+                        0
+                    </strong>
+
+                    <span class="best-combo">
+                        BEST
+                        <span id="bestCombo">
+                            0
+                        </span>
+                    </span>
+
+                </div>
+
+
+                <div class="multiplier-card">
+
+                    <div class="multiplier-row">
+                        <span class="hud-label">
+                            COMBO
+                        </span>
+
+                        <strong id="comboMultiplier">
+                            x1.00
+                        </strong>
+                    </div>
+
+                    <div class="multiplier-row total">
+                        <span class="hud-label">
+                            PAYOUT
+                        </span>
+
+                        <strong id="totalMultiplier">
+                            x1.00
+                        </strong>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div
+                class="highway"
+                id="highway"
+            >
+
+                <div
+                    class="lane"
+                    id="lane-0"
+                >
+                    <div
+                        class="target-zone"
+                        id="target-0"
+                    >
+                        D
+                    </div>
+                </div>
+
+                <div
+                    class="lane"
+                    id="lane-1"
+                >
+                    <div
+                        class="target-zone"
+                        id="target-1"
+                    >
+                        F
+                    </div>
+                </div>
+
+                <div
+                    class="lane"
+                    id="lane-2"
+                >
+                    <div
+                        class="target-zone"
+                        id="target-2"
+                    >
+                        J
+                    </div>
+                </div>
+
+                <div
+                    class="lane"
+                    id="lane-3"
+                >
+                    <div
+                        class="target-zone"
+                        id="target-3"
+                    >
+                        K
+                    </div>
+                </div>
+
+                <div id="effectsLayer"></div>
+
+                <div
+                    id="judgement"
+                    aria-hidden="true"
+                ></div>
+
+            </div>
+
+        </main>
+
+
+        <!-- =========================
+             RIGHT: RHYTHM CONTROLS
+        ========================== -->
+
+        <aside class="rhythm-control-panel">
+
+            <div class="panel-heading">
+                <span class="panel-eyebrow">
+                    THE STAGE
+                </span>
+
+                <h2>
+                    Rhythm
+                </h2>
+            </div>
+
+
+            <section class="rhythm-section">
+
+                <div class="section-title">
+                    <span>
+                        WAGER
+                    </span>
+
+                    <span class="section-number">
+                        01
+                    </span>
+                </div>
+
+                <p>
+                    Choose how many chips you're willing to risk.
+                </p>
+
+                <label
+                    class="wager-label"
+                    for="wager"
+                >
+                    YOUR BET
+                </label>
+
+                <div class="wager-input-wrap">
+
+                    <span class="wager-symbol">
+                        ◆
+                    </span>
+
+                    <input
+                        type="number"
+                        id="wager"
+                        value="10"
+                        min="1"
+                    >
+
+                    <span class="wager-unit">
+                        CHIPS
+                    </span>
+
+                </div>
+
+                <button
+                    id="startBtn"
+                    class="start-show-button"
+                    onclick="startConcert()"
+                >
+
+                    <span class="start-main">
+                        START SHOW
+                    </span>
+
+                    <span class="start-sub">
+                        Risk the wager
+                    </span>
+
+                </button>
+
+                <div
+                    id="message"
+                    aria-live="polite"
+                ></div>
+
+            </section>
+
+
+            <section class="rhythm-section">
+
+                <div class="section-title">
+                    <span>
+                        RHYTHM UPGRADES
+                    </span>
+
+                    <span class="section-number">
+                        02
+                    </span>
+                </div>
+
+                <button
+                    class="rhythm-upgrade-card"
+                    id="rightSpeedUpgrade"
+                    onclick="buyUpgrade('speed')"
+                >
+
+                    <div class="rhythm-upgrade-icon">
+                        ♪
+                    </div>
+
+                    <div class="rhythm-upgrade-info">
+
+                        <strong>
+                            Increase Tempo
+                        </strong>
+
+                        <span>
+                            +50 note speed
+                        </span>
+
+                        <span>
+                            +0.2× rhythm payout
+                        </span>
+
+                    </div>
+
+                    <div class="rhythm-upgrade-price">
+
+                        <span>
+                            LV.
+                            <b id="rightSpeedLevel">
+                                0
+                            </b>
+                        </span>
+
+                        <strong id="rightSpeedCost">
+                            50
+                        </strong>
+
+                    </div>
+
+                </button>
+
+            </section>
+
+
+            <section class="rhythm-section">
+
+                <div class="section-title">
+                    <span>
+                        PERFORMANCE
+                    </span>
+
+                    <span class="section-number">
+                        03
+                    </span>
+                </div>
+
+                <div class="rhythm-stat-grid">
+
+                    <div class="rhythm-stat">
+                        <span>
+                            Tempo
+                        </span>
+
+                        <strong id="tempoStat">
+                            300
+                        </strong>
+                    </div>
+
+                    <div class="rhythm-stat">
+                        <span>
+                            Base Payout
+                        </span>
+
+                        <strong id="payoutStat">
+                            x1.0
+                        </strong>
+                    </div>
+
+                    <div class="rhythm-stat">
+                        <span>
+                            Best Combo
+                        </span>
+
+                        <strong id="rightBestCombo">
+                            0
+                        </strong>
+                    </div>
+
+                    <div class="rhythm-stat">
+                        <span>
+                            Fame Bonus
+                        </span>
+
+                        <strong id="rightFameMultiplier">
+                            x1
+                        </strong>
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <div class="rhythm-tip">
+                <span>PERFECT</span>
+                hits fill the Jackpot fastest.
+            </div>
+
+        </aside>
+
+    </div>
+
+    <script src="script.js"></script>
+
+</body>
+</html>
