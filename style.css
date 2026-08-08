@@ -165,10 +165,11 @@ hr { border: 0; height: 1px; margin: 20px 0; background: rgba(255,255,255,0.08);
 .hud-label { color: #697278; font-size: 8px; font-weight: 900; letter-spacing: 1px; }
 #comboDisplay { color: #fff; font-size: 34px; }
 .best-combo { color: #596168; font-size: 8px; }
-.multiplier-card { display: grid; grid-template-rows: 1fr 1fr; }
-.multiplier-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; }
+.multiplier-card { display: grid; grid-template-rows: 1fr 1fr 1fr; }
+.multiplier-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; }
 .multiplier-row + .multiplier-row { border-top: 1px solid var(--border); }
 .multiplier-row strong { color: var(--green); }
+.multiplier-row.heat strong { color: var(--pink); }
 .multiplier-row.total strong { color: var(--gold); }
 
 /* HIGHWAY */
@@ -237,6 +238,12 @@ hr { border: 0; height: 1px; margin: 20px 0; background: rgba(255,255,255,0.08);
 .start-show-button:disabled { color: #626a70; background: #22272b; cursor: not-allowed; }
 .start-main { font-size: 11px; font-weight: 900; }
 .start-sub { margin-top: 2px; font-size: 8px; opacity: 0.6; }
+
+.cash-out-button {
+    width: 100%; margin-top: 8px; padding: 11px; display: flex; flex-direction: column; align-items: center;
+    color: #171006; background: linear-gradient(#ffe38f, var(--gold)); border: 0; border-radius: 8px; cursor: pointer;
+}
+.cash-out-button:disabled { color: #626a70; background: #22272b; cursor: not-allowed; }
 
 /* RHYTHM UPGRADE */
 .rhythm-upgrade-card {
