@@ -1287,6 +1287,16 @@ document.addEventListener('keydown', event => {
     if (event.code in keyMap && !event.repeat) {
         event.preventDefault();
         handleKeyDown(keyMap[event.code]);
+        return;
+    }
+
+    // Cash Out on Space: with both hands on D/F/J/K, reaching for the
+    // mouse to click the button would mean letting go of the keys right
+    // when you're worried about missing. Space sits under a thumb, so
+    // either hand can trigger it without moving off the note keys.
+    if (event.code === 'Space' && !event.repeat) {
+        event.preventDefault();
+        cashOut();
     }
 });
 
