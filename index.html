@@ -48,7 +48,7 @@
             <div class="rhythm-header">
                 <div>
                     <span class="panel-eyebrow">ACTIVE GAME</span>
-                    <h1>Goobers Goofy Casino</h1>
+                    <h1>All-In Crescendo</h1>
                 </div>
                 <div class="controls-mini">
                     <span>D</span>
@@ -71,6 +71,10 @@
                     <div class="multiplier-row">
                         <span class="hud-label">COMBO</span>
                         <strong id="comboMultiplier">x1.00</strong>
+                    </div>
+                    <div class="multiplier-row heat">
+                        <span class="hud-label">HEAT</span>
+                        <strong id="heatMultiplier">x1.00</strong>
                     </div>
                     <div class="multiplier-row total">
                         <span class="hud-label">PAYOUT</span>
@@ -134,6 +138,11 @@
                     <span class="start-sub">Risk the wager</span>
                 </button>
 
+                <button id="cashOutBtn" class="cash-out-button" onclick="cashOut()" disabled>
+                    <span class="start-main">CASH OUT</span>
+                    <span class="start-sub">Bank it before you bust</span>
+                </button>
+
                 <div id="message" aria-live="polite"></div>
             </section>
 
@@ -184,7 +193,7 @@
             </section>
 
             <div class="rhythm-tip">
-                <span>PERFECT</span> hits fill the Jackpot fastest.
+                <span>PERFECT</span> hits fill the Jackpot fastest. Combo raises the HEAT — busting costs half of this run's earnings, so <span>Cash Out</span> before it gets away from you.
             </div>
         </aside>
 
