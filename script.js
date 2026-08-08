@@ -49,6 +49,7 @@ const BUILDING_ORDER = [
     'vip', 'highRoller', 'corporate', 'empire'
 ];
 
+
 const state = {
     chips: 0,
     lastTick: performance.now(),
