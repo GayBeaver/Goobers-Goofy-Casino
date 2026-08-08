@@ -50,7 +50,7 @@ const BUILDING_ORDER = [
 ];
 
 const state = {
-    chips: 100,
+    chips: 0,
     lastTick: performance.now(),
     autosaveTimer: 0,
     uiUpdateTimer: 0,
