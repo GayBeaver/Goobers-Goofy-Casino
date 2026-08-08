@@ -44,6 +44,30 @@ const OLD_SAVE_KEY = 'allInCrescendoSave_v3';
 const OFFLINE_CAP_SECONDS = 8 * 60 * 60;
 const UI_UPDATE_INTERVAL = 1 / 15;
 
+// =========================================================
+// IN-RUN ESCALATION + CASH OUT
+//
+// Difficulty now climbs *within* a show as your combo grows,
+// separate from your permanent Tempo upgrade (which is your
+// starting difficulty for a show, not your only difficulty).
+// Every ESCALATION_COMBO_STEP combo, note speed ticks up and
+// spawn interval ticks down, capped at ESCALATION_MAX_STEPS.
+// Since it's a pure function of combo, it also eases back off
+// automatically whenever combo resets, with no separate state
+// to track or reset by hand.
+//
+// This only means something if riding it out is actually
+// risky, so busting now forfeits a cut of what you earned
+// *this run* (not your permanent chip stash from before the
+// show, and not your prestige progress). Cash Out lets you
+// lock in 100% of a run's earnings and walk away instead.
+// =========================================================
+const ESCALATION_COMBO_STEP = 8;
+const ESCALATION_MAX_STEPS = 12;
+const ESCALATION_SPEED_STEP = 0.05;
+const ESCALATION_SPAWN_STEP = 0.06;
+const BUST_FORFEIT_RATE = 0.5;
+
 const BUILDING_ORDER = [
     'busker', 'slots', 'blackjack', 'roulette',
     'vip', 'highRoller', 'corporate', 'empire'
@@ -63,6 +87,7 @@ const state = {
     // Rhythm game
     isPlaying: false,
     wager: 0,
+    showEarnings: 0,
     notes: [],
     spawnTimer: 0,
     spawnInterval: 1.2,
@@ -259,12 +284,14 @@ const ui = {
     chips: document.getElementById('chips'),
     idleIncome: document.getElementById('idleIncome'),
     startBtn: document.getElementById('startBtn'),
+    cashOutBtn: document.getElementById('cashOutBtn'),
     message: document.getElementById('message'),
     wagerInput: document.getElementById('wager'),
     comboCard: document.getElementById('comboCard'),
     comboDisplay: document.getElementById('comboDisplay'),
     bestCombo: document.getElementById('bestCombo'),
     comboMultiplier: document.getElementById('comboMultiplier'),
+    heatMultiplier: document.getElementById('heatMultiplier'),
     totalMultiplier: document.getElementById('totalMultiplier'),
     lanes: [0, 1, 2, 3].map(i => document.getElementById(`lane-${i}`)),
     targets: [0, 1, 2, 3].map(i => document.getElementById(`target-${i}`))
@@ -340,6 +367,30 @@ function changeTempo(direction) {
     syncTempoStats();
     showMessage(`Tempo set to level ${state.tempo.activeLevel}. Speed ${state.noteSpeed}.`, 'win');
     updateUI();
+}
+
+/* =========================================================
+   IN-RUN ESCALATION
+========================================================= */
+
+function getEscalationStep() {
+    return Math.min(ESCALATION_MAX_STEPS, Math.floor(state.combo / ESCALATION_COMBO_STEP));
+}
+
+function getEscalationSpeedMultiplier() {
+    return 1 + getEscalationStep() * ESCALATION_SPEED_STEP;
+}
+
+// Effective note speed right now: your equipped Tempo (state.noteSpeed)
+// scaled up by how far your current combo has pushed the escalation.
+function getEffectiveNoteSpeed() {
+    return state.noteSpeed * getEscalationSpeedMultiplier();
+}
+
+// Effective spawn interval right now: shrinks (notes come faster) as
+// escalation climbs, compounding per step.
+function getEffectiveSpawnInterval() {
+    return state.spawnInterval * Math.pow(1 - ESCALATION_SPAWN_STEP, getEscalationStep());
 }
 
 /* =========================================================
@@ -652,6 +703,7 @@ function awardSuccessfulNote(quality, laneIndex, isLong, holdEarned = 0) {
     );
 
     addChips(reward);
+    state.showEarnings += reward;
 
     playSuccessEffects(
         laneIndex,
@@ -692,7 +744,7 @@ function gameLoop(currentTick) {
 
     if (state.isPlaying) {
         state.spawnTimer += rhythmDeltaTime;
-        if (state.spawnTimer >= state.spawnInterval) {
+        if (state.spawnTimer >= getEffectiveSpawnInterval()) {
             state.spawnTimer = 0;
             spawnNote();
         }
@@ -703,8 +755,10 @@ function gameLoop(currentTick) {
             // Bug fix: a held note used to keep travelling downward,
             // requiring it to scroll off the visible highway before the
             // hold could complete. It now freezes at the y it was hit.
+            // Uses the live escalated speed, so notes already in flight
+            // smoothly speed up as your combo (and the heat) climbs.
             if (!note.isHolding) {
-                note.y += state.noteSpeed * rhythmDeltaTime;
+                note.y += getEffectiveNoteSpeed() * rhythmDeltaTime;
             }
 
             const head = document.getElementById(note.id);
@@ -732,6 +786,7 @@ function gameLoop(currentTick) {
                 const reward = state.holdRewardPerSecond * rhythmDeltaTime * getTotalPayoutMultiplier();
                 addChips(reward);
                 note.holdEarned += reward;
+                state.showEarnings += reward;
 
                 if (note.holdElapsed >= note.holdDuration) {
                     const lane = note.lane;
@@ -863,7 +918,7 @@ function handleKeyDown(laneIndex) {
         if (note.isLong) {
             note.isHolding = true;
             note.holdElapsed = 0;
-            note.holdDuration = note.length / state.noteSpeed;
+            note.holdDuration = note.length / getEffectiveNoteSpeed();
             state.activeHoldNote[laneIndex] = note;
 
             ui.targets[laneIndex].classList.add('holding');
@@ -920,11 +975,13 @@ function startConcert() {
 
     state.chips -= wager;
     state.wager = wager;
+    state.showEarnings = 0;
     state.combo = 0;
     state.spawnTimer = 0;
     clearAllNotes();
     state.isPlaying = true;
     ui.startBtn.disabled = true;
+    ui.cashOutBtn.disabled = false;
 
     showJudgement('READY', 'good');
     showMessage(`Show started at Tempo ${state.tempo.activeLevel}!`, 'win');
@@ -934,16 +991,40 @@ function finishGame(won, text) {
     state.isPlaying = false;
     clearAllNotes();
 
-    if (!won) {
-        state.combo = 0;
+    if (won) {
+        showJudgement('CASHED OUT', 'milestone');
+        triggerShake('small');
+        flashScreen('#ffd86b');
+        showMessage(text, 'win');
+    } else {
+        // Busting forfeits a cut of what you earned THIS run only —
+        // not your chip stash from before the show, and not your
+        // lifetime/prestige earnings, which already booked the full
+        // amount when it was earned.
+        const forfeit = Math.floor(state.showEarnings * BUST_FORFEIT_RATE);
+        if (forfeit > 0) {
+            state.chips = Math.max(0, state.chips - forfeit);
+        }
+
         showJudgement('BUST!', 'miss');
         triggerShake('big');
         flashScreen('#ff376f');
+        showMessage(forfeit > 0 ? `${text} Lost ${formatNumber(forfeit)} chips from this run.` : text, 'lose');
     }
 
+    state.combo = 0;
     state.wager = 0;
+    state.showEarnings = 0;
     ui.startBtn.disabled = false;
-    showMessage(text, won ? 'win' : 'lose');
+    ui.cashOutBtn.disabled = true;
+    updateUI();
+}
+
+// Voluntarily end a show as a win, banking 100% of this run's earnings
+// instead of risking them on the next note.
+function cashOut() {
+    if (!state.isPlaying) return;
+    finishGame(true, `Cashed out with ${formatNumber(state.showEarnings)} chips banked!`);
 }
 
 /* =========================================================
@@ -1045,6 +1126,7 @@ function updateUI() {
     ui.comboDisplay.innerText = state.combo;
     ui.bestCombo.innerText = state.bestCombo;
     ui.comboMultiplier.innerText = `x${getComboMultiplier().toFixed(2)}`;
+    ui.heatMultiplier.innerText = `x${getEscalationSpeedMultiplier().toFixed(2)}`;
     ui.totalMultiplier.innerText = `x${getTotalPayoutMultiplier().toFixed(2)}`;
 
     ui.casinoIncomeDisplay.innerText = `${formatNumber(idleIncome)}/sec`;
