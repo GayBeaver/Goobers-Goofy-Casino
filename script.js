@@ -1,3 +1,44 @@
+/* =========================================================
+   ALL-IN CRESCENDO — fixed & optimized build
+
+   Bug fixes:
+   1. Buying the "Increase Tempo" upgrade mid-show used to jump
+      state.tempo.activeLevel immediately, silently changing
+      note speed/payout under the player's feet — even though
+      changeTempo() explicitly refuses to do this while playing.
+      Now the new tempo is only auto-selected when no show is
+      in progress; mid-show it just banks for next time.
+   2. Long/hold notes required the player to keep holding the
+      key for ~110px after the note had already scrolled off
+      the bottom of the 600px-tall highway (the hit window ends
+      at y=560, but the note needed to travel to y=710 to
+      register as complete). The note now freezes in place the
+      moment it's hit and its tail visibly shrinks toward the
+      head; completion is time-based instead of position-based,
+      so nothing ever needs to be held past what's on screen.
+   3. CSS already defines a "held" state (.note.held /
+      .long-note-body.held, a white glow) but nothing in the
+      original code ever added that class, so it never showed.
+      It's now applied the moment a hold note is caught.
+
+   Performance fixes:
+   4. getBulkCost()/getMaxAffordable() used to loop unit-by-unit
+      (O(n), and O(n^2) for "max affordable"). Replaced with a
+      closed-form geometric-series formula (O(1) plus a couple
+      of corrective steps for floating-point safety). This
+      matters a lot once building counts get large, since "Buy
+      Max" mode recomputed this for all 8 buildings every frame.
+   5. updateUI() used ~50 document.getElementById() calls per
+      invocation; DOM refs are now cached once after the
+      dynamic UI is injected.
+   6. updateUI() ran on every animation frame (60/sec). It's now
+      throttled to ~15/sec — note movement is updated directly
+      inside the game loop every frame regardless, so gameplay
+      feel/smoothness is unaffected, but idle DOM churn drops by
+      75%. Player actions (buying, hitting a note, etc.) still
+      call updateUI() immediately for instant feedback.
+========================================================= */
+
 const SAVE_KEY = 'allInCrescendoSave_v4';
 const OLD_SAVE_KEY = 'allInCrescendoSave_v3';
 const OFFLINE_CAP_SECONDS = 8 * 60 * 60;
@@ -53,14 +94,14 @@ const state = {
     buyMode: '1',
     casino: {
         buildings: {
-            busker:      { name: "Busker",               amount: 0, baseCost: 10,       costGrowth: 1.07, baseIncome: 1 },
-            slots:       { name: "Slot Machines",        amount: 0, baseCost: 100,      costGrowth: 1.12, baseIncome: 5 },
-            blackjack:   { name: "Blackjack Tables",     amount: 0, baseCost: 1000,     costGrowth: 1.15, baseIncome: 25 },
-            roulette:    { name: "Roulette",             amount: 0, baseCost: 12000,    costGrowth: 1.18, baseIncome: 120 },
-            vip:         { name: "VIP Lounge",           amount: 0, baseCost: 150000,   costGrowth: 1.22, baseIncome: 800 },
-            highRoller:  { name: "High Roller Suite",    amount: 0, baseCost: 2000000,  costGrowth: 1.28, baseIncome: 5000 },
-            corporate:   { name: "Corporate Sponsor",    amount: 0, baseCost: 35000000, costGrowth: 1.35, baseIncome: 40000 },
-            empire:      { name: "Casino Empire",        amount: 0, baseCost: 500000000,costGrowth: 1.45, baseIncome: 300000 }
+            busker:      { name: "Busker",               amount: 0, baseCost: 10,        costGrowth: 1.07, baseIncome: 1 },
+            slots:       { name: "Slot Machines",        amount: 0, baseCost: 100,       costGrowth: 1.12, baseIncome: 5 },
+            blackjack:   { name: "Blackjack Tables",     amount: 0, baseCost: 1000,      costGrowth: 1.15, baseIncome: 25 },
+            roulette:    { name: "Roulette",             amount: 0, baseCost: 12000,     costGrowth: 1.18, baseIncome: 120 },
+            vip:         { name: "VIP Lounge",           amount: 0, baseCost: 150000,    costGrowth: 1.22, baseIncome: 800 },
+            highRoller:  { name: "High Roller Suite",    amount: 0, baseCost: 2000000,   costGrowth: 1.28, baseIncome: 5000 },
+            corporate:   { name: "Corporate Sponsor",    amount: 0, baseCost: 35000000,  costGrowth: 1.35, baseIncome: 40000 },
+            empire:      { name: "Casino Empire",        amount: 0, baseCost: 500000000, costGrowth: 1.45, baseIncome: 300000 }
         }
     },
 
@@ -378,6 +419,7 @@ function getIdleIncomePerSecond() {
     return calculateBaseCasinoIncome() * getFameMultiplier() * (state.feverActive ? state.feverMultiplier : 1);
 }
 
+// Closed-form geometric-series cost instead of summing per-unit in a loop.
 function getBulkCost(type, quantity) {
     if (quantity <= 0) return 0;
 
@@ -391,6 +433,9 @@ function getBulkCost(type, quantity) {
     return Math.floor(total);
 }
 
+// Closed-form "how many can I afford" instead of incrementing one at a
+// time (which was O(n) per call, and was being called every frame for
+// every building while in "Buy Max" mode).
 function getMaxAffordable(type) {
     const building = state.casino.buildings[type];
     const r = building.costGrowth;
@@ -409,6 +454,7 @@ function getMaxAffordable(type) {
 
     k = Math.max(0, Math.min(k, 10000));
 
+    // Floating-point safety net — nudges k to the exact boundary.
     while (k < 10000 && getBulkCost(type, k + 1) <= chips) k++;
     while (k > 0 && getBulkCost(type, k) > chips) k--;
 
@@ -517,12 +563,18 @@ function activateFever() {
 
 function getComboMultiplier() {
     if (state.combo <= 0) return 1;
-    
-    // Uses Square Root scaling: 
-    // 5 Combo = x2.2 multiplier
+
+    // Uses Square Root scaling:
+    // 5 Combo = ~x2.12 multiplier
     // 25 Combo = x3.5 multiplier
     // 100 Combo = x6.0 multiplier
-    return Math.floor(1 + Math.sqrt(state.combo) * 0.5);
+    //
+    // Bug fix: this used to be wrapped in Math.floor(), which forced it
+    // to whole numbers (x2, x3, x6) and quietly contradicted the
+    // fractional targets documented right above. No cap on this one by
+    // design — it grows slowly (sqrt), so very long combos are still
+    // rewarded but never blow up.
+    return 1 + Math.sqrt(state.combo) * 0.5;
 }
 
 function getTotalPayoutMultiplier() {
@@ -546,6 +598,11 @@ function buyUpgrade(type) {
     upgrade.unlockedLevel++;
     upgrade.cost = Math.floor(upgrade.cost * upgrade.costMult);
 
+    // Bug fix: this used to unconditionally jump activeLevel (and thus
+    // noteSpeed/payoutMultiplier) to the new level even mid-show, which
+    // silently violated the "no tempo changes during a show" rule that
+    // changeTempo() enforces. Only auto-select the new tempo when no
+    // show is currently running.
     if (!state.isPlaying) {
         upgrade.activeLevel = upgrade.unlockedLevel;
         syncTempoStats();
@@ -581,7 +638,12 @@ function getHitJudgement(noteCenter) {
 
 function awardSuccessfulNote(quality, laneIndex, isLong, holdEarned = 0) {
     state.combo++;
+
+    // New: celebrate the moment a run beats your all-time best combo,
+    // taking priority over the regular "X COMBO!" milestone ping.
+    const brokeRecord = state.bestCombo > 0 && state.combo > state.bestCombo;
     state.bestCombo = Math.max(state.bestCombo, state.combo);
+
     addJackpot(quality.jackpot);
 
     const reward = Math.max(
@@ -598,7 +660,10 @@ function awardSuccessfulNote(quality, laneIndex, isLong, holdEarned = 0) {
         isLong ? 'LONG COMPLETE' : quality.label
     );
 
-    if (state.combo % 5 === 0) {
+    if (brokeRecord) {
+        showJudgement('NEW BEST!', 'milestone');
+        triggerShake('medium');
+    } else if (state.combo % 5 === 0) {
         showJudgement(`${state.combo} COMBO!`, 'milestone');
     }
 
@@ -635,6 +700,9 @@ function gameLoop(currentTick) {
         for (let i = state.notes.length - 1; i >= 0; i--) {
             const note = state.notes[i];
 
+            // Bug fix: a held note used to keep travelling downward,
+            // requiring it to scroll off the visible highway before the
+            // hold could complete. It now freezes at the y it was hit.
             if (!note.isHolding) {
                 note.y += state.noteSpeed * rhythmDeltaTime;
             }
@@ -690,6 +758,8 @@ function gameLoop(currentTick) {
         saveGame();
     }
 
+    // UI text/number updates are throttled — note movement above still
+    // happens every frame, so this doesn't affect gameplay feel.
     state.uiUpdateTimer += rawDeltaTime;
     if (state.uiUpdateTimer >= UI_UPDATE_INTERVAL) {
         state.uiUpdateTimer = 0;
@@ -797,6 +867,8 @@ function handleKeyDown(laneIndex) {
             state.activeHoldNote[laneIndex] = note;
 
             ui.targets[laneIndex].classList.add('holding');
+            // Bug fix: CSS defines a "held" glow state for notes/bodies
+            // being held, but nothing ever applied the class before.
             document.getElementById(note.id)?.classList.add('held');
             document.getElementById(note.id + '-body')?.classList.add('held');
 
@@ -805,5 +877,357 @@ function handleKeyDown(laneIndex) {
             cleanupNoteCompletely(index);
             awardSuccessfulNote(quality, laneIndex, false);
         }
+    } else if (center < state.targetStart) {
+        state.combo = 0;
+    } else {
+        finishGame(false, 'Too late!');
     }
 }
+
+function handleKeyUp(laneIndex) {
+    const note = state.activeHoldNote[laneIndex];
+    if (!note) return;
+
+    const index = state.notes.findIndex(n => n.id === note.id);
+    if (index !== -1) {
+        cleanupNoteCompletely(index);
+        finishGame(false, 'Released too early!');
+    }
+}
+
+/* =========================================================
+   WAGER QUICK-SET
+========================================================= */
+
+// New: 25% / 50% / MAX buttons next to the wager input so players don't
+// have to type an amount or do the math themselves every time.
+function setWagerFraction(fraction) {
+    const amount = Math.max(1, Math.floor(state.chips * fraction));
+    ui.wagerInput.value = state.chips > 0 ? amount : 1;
+}
+
+/* =========================================================
+   START / FINISH
+========================================================= */
+
+function startConcert() {
+    const wager = parseInt(ui.wagerInput.value, 10);
+
+    if (wager <= 0 || wager > state.chips || Number.isNaN(wager)) {
+        showMessage('Invalid wager!', 'lose');
+        return;
+    }
+
+    state.chips -= wager;
+    state.wager = wager;
+    state.combo = 0;
+    state.spawnTimer = 0;
+    clearAllNotes();
+    state.isPlaying = true;
+    ui.startBtn.disabled = true;
+
+    showJudgement('READY', 'good');
+    showMessage(`Show started at Tempo ${state.tempo.activeLevel}!`, 'win');
+}
+
+function finishGame(won, text) {
+    state.isPlaying = false;
+    clearAllNotes();
+
+    if (!won) {
+        state.combo = 0;
+        showJudgement('BUST!', 'miss');
+        triggerShake('big');
+        flashScreen('#ff376f');
+    }
+
+    state.wager = 0;
+    ui.startBtn.disabled = false;
+    showMessage(text, won ? 'win' : 'lose');
+}
+
+/* =========================================================
+   EFFECTS
+========================================================= */
+
+function playSuccessEffects(lane, quality, reward, text) {
+    flashLane(lane, quality.color);
+    spawnParticles(lane, quality.particles, quality.color);
+    showFloatingScore(lane, `+${formatNumber(reward)}`, quality.color);
+    showJudgement(text, quality.className);
+    triggerShake(quality.shake);
+}
+
+function flashLane(lane, color) {
+    const element = ui.lanes[lane];
+    element.style.setProperty('--flash-color', color);
+    element.classList.remove('hit-flash');
+    void element.offsetWidth;
+    element.classList.add('hit-flash');
+}
+
+function spawnParticles(lane, count, color) {
+    const width = ui.highway.clientWidth / 4;
+    const x = lane * width + width / 2;
+    const y = (state.targetStart + state.targetEnd) / 2;
+
+    for (let i = 0; i < count; i++) {
+        const particle = document.createElement('div');
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 30 + Math.random() * 70;
+
+        particle.className = 'particle';
+        particle.style.setProperty('--x', `${x}px`);
+        particle.style.setProperty('--y', `${y}px`);
+        particle.style.setProperty('--dx', `${Math.cos(angle) * distance}px`);
+        particle.style.setProperty('--dy', `${Math.sin(angle) * distance}px`);
+        particle.style.setProperty('--rotation', `${Math.random() * 180}deg`);
+        particle.style.setProperty('--size', `${3 + Math.random() * 6}px`);
+        particle.style.setProperty('--radius', '50%');
+        particle.style.setProperty('--particle-color', color);
+
+        ui.effectsLayer.appendChild(particle);
+        setTimeout(() => particle.remove(), 700);
+    }
+}
+
+function showFloatingScore(lane, text, color) {
+    const width = ui.highway.clientWidth / 4;
+    const score = document.createElement('div');
+
+    score.className = 'floating-score';
+    score.innerText = text;
+    score.style.setProperty('--x', `${lane * width + width / 2}px`);
+    score.style.setProperty('--y', `${state.targetStart}px`);
+    score.style.setProperty('--score-color', color);
+
+    ui.effectsLayer.appendChild(score);
+    setTimeout(() => score.remove(), 800);
+}
+
+function showJudgement(text, className) {
+    ui.judgement.innerText = text;
+    ui.judgement.className = '';
+    void ui.judgement.offsetWidth;
+    ui.judgement.classList.add(className, 'show');
+}
+
+function triggerShake(strength) {
+    ui.gameShell.classList.remove('shake-small', 'shake-medium', 'shake-big');
+    void ui.gameShell.offsetWidth;
+    ui.gameShell.classList.add(`shake-${strength}`);
+}
+
+function flashScreen(color) {
+    ui.screenFlash.style.setProperty('--screen-flash-color', color);
+    ui.screenFlash.classList.remove('fire');
+    void ui.screenFlash.offsetWidth;
+    ui.screenFlash.classList.add('fire');
+}
+
+function showMessage(text, type) {
+    ui.message.innerText = text;
+    ui.message.className = type;
+}
+
+/* =========================================================
+   UPDATE UI
+========================================================= */
+
+function updateUI() {
+    const idleIncome = getIdleIncomePerSecond();
+    const fameMultiplier = getFameMultiplier();
+    const fameGain = calculateFameGain();
+
+    ui.chips.innerText = formatNumber(state.chips);
+    ui.idleIncome.innerText = formatNumber(idleIncome);
+    ui.wagerInput.max = Math.max(1, Math.floor(state.chips));
+    ui.comboDisplay.innerText = state.combo;
+    ui.bestCombo.innerText = state.bestCombo;
+    ui.comboMultiplier.innerText = `x${getComboMultiplier().toFixed(2)}`;
+    ui.totalMultiplier.innerText = `x${getTotalPayoutMultiplier().toFixed(2)}`;
+
+    ui.casinoIncomeDisplay.innerText = `${formatNumber(idleIncome)}/sec`;
+    ui.fameMultiplierMini.innerText = `x${fameMultiplier}`;
+    ui.fameDisplay.innerText = state.fame;
+    ui.fameMultiplierDisplay.innerText = `x${fameMultiplier}`;
+    ui.runEarnedDisplay.innerText = formatNumber(state.runChipsEarned);
+    ui.fameGainDisplay.innerText = `+${fameGain} Fame`;
+    ui.sellCasinoBtn.disabled = fameGain <= 0;
+
+    for (const type of BUILDING_ORDER) {
+        const building = state.casino.buildings[type];
+        const refs = ui.buildings[type];
+        const quantity = getPurchaseQuantity(type);
+        const cost = quantity > 0 ? getBulkCost(type, quantity) : getBulkCost(type, 1);
+
+        refs.owned.innerText = building.amount;
+        refs.cost.innerText = formatNumber(cost);
+        refs.income.innerText = `${formatNumber(getBuildingIncome(building))}/sec • x${getBuildingMilestoneMultiplier(building.amount)}`;
+
+        const next = getNextMilestone(building.amount);
+        refs.milestone.innerText = next ? `Next milestone: ${next}` : 'All milestones unlocked';
+        refs.button.disabled = quantity <= 0 || state.chips < cost;
+    }
+
+    ui.buyMode1.classList.toggle('selected', state.buyMode === '1');
+    ui.buyMode10.classList.toggle('selected', state.buyMode === '10');
+    ui.buyModeMax.classList.toggle('selected', state.buyMode === 'max');
+
+    ui.rightSpeedUpgrade.disabled = state.chips < state.tempo.cost;
+    ui.rightSpeedCost.innerText = formatNumber(state.tempo.cost);
+    ui.rightSpeedLevel.innerText = state.tempo.unlockedLevel;
+
+    ui.tempoLevelDisplay.innerText = `${state.tempo.activeLevel} / ${state.tempo.unlockedLevel}`;
+    ui.tempoSpeedDisplay.innerText = Math.round(state.noteSpeed);
+    ui.tempoPayoutDisplay.innerText = `x${state.payoutMultiplier.toFixed(2)}`;
+    ui.tempoDownBtn.disabled = state.isPlaying || state.tempo.activeLevel <= 0;
+    ui.tempoUpBtn.disabled = state.isPlaying || state.tempo.activeLevel >= state.tempo.unlockedLevel;
+
+    ui.tempoStat.innerText = Math.round(state.noteSpeed);
+    ui.payoutStat.innerText = `x${state.payoutMultiplier.toFixed(2)}`;
+    ui.rightBestCombo.innerText = state.bestCombo;
+    ui.rightFameMultiplier.innerText = `x${fameMultiplier}`;
+
+    const jackpotPercent = state.jackpot / state.jackpotMax * 100;
+    ui.jackpotFill.style.width = `${jackpotPercent}%`;
+    ui.jackpotText.innerText = `${Math.floor(state.jackpot)} / ${state.jackpotMax}`;
+
+    if (state.feverActive) {
+        ui.feverBtn.disabled = true;
+        ui.feverBtn.innerText = `FEVER x3 • ${state.feverTimeRemaining.toFixed(1)}s`;
+    } else if (state.jackpot >= state.jackpotMax) {
+        ui.feverBtn.disabled = false;
+        ui.feverBtn.innerText = 'ACTIVATE FEVER';
+    } else {
+        ui.feverBtn.disabled = true;
+        ui.feverBtn.innerText = `FEVER LOCKED • ${Math.floor(jackpotPercent)}%`;
+    }
+}
+
+/* =========================================================
+   SAVE
+========================================================= */
+
+function saveGame() {
+    try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify({
+            chips: state.chips,
+            fame: state.fame,
+            runChipsEarned: state.runChipsEarned,
+            lifetimeChipsEarned: state.lifetimeChipsEarned,
+            bestCombo: state.bestCombo,
+            casino: state.casino,
+            buyMode: state.buyMode,
+            tempo: state.tempo,
+            jackpot: state.jackpot,
+            savedAt: Date.now()
+        }));
+    } catch (error) {
+        console.error('Save failed:', error);
+    }
+}
+
+/* =========================================================
+   LOAD
+========================================================= */
+
+function loadGame() {
+    let raw = localStorage.getItem(SAVE_KEY);
+
+    // Try old V3 save so existing progress isn't automatically lost.
+    if (!raw) raw = localStorage.getItem(OLD_SAVE_KEY);
+    if (!raw) {
+        syncTempoStats();
+        return;
+    }
+
+    try {
+        const save = JSON.parse(raw);
+
+        state.chips = save.chips ?? state.chips;
+        state.fame = save.fame ?? 0;
+        state.runChipsEarned = save.runChipsEarned ?? 0;
+        state.lifetimeChipsEarned = save.lifetimeChipsEarned ?? 0;
+        state.bestCombo = save.bestCombo ?? 0;
+        state.buyMode = save.buyMode ?? '1';
+
+        if (save.casino) {
+            for (const type of BUILDING_ORDER) {
+                const savedBuilding = save.casino.buildings?.[type];
+                if (savedBuilding) {
+                    Object.assign(state.casino.buildings[type], savedBuilding);
+                }
+            }
+        }
+
+        if (save.tempo) {
+            Object.assign(state.tempo, save.tempo);
+        } else if (save.upgrades?.speed) {
+            // Migrate old tempo save format.
+            const oldLevel = save.upgrades.speed.level ?? 0;
+            state.tempo.unlockedLevel = oldLevel;
+            state.tempo.activeLevel = Math.min(oldLevel, 5);
+            state.tempo.cost = Math.floor(state.tempo.baseCost * Math.pow(state.tempo.costMult, oldLevel));
+        }
+
+        state.jackpot = save.jackpot ?? 0;
+        state.feverActive = false;
+        state.feverTimeRemaining = 0;
+
+        syncTempoStats();
+
+        if (save.savedAt) {
+            const secondsAway = Math.min(
+                OFFLINE_CAP_SECONDS,
+                Math.max(0, (Date.now() - save.savedAt) / 1000)
+            );
+
+            if (secondsAway > 5) {
+                const reward = getIdleIncomePerSecond() * secondsAway;
+                addChips(reward);
+                showMessage(`Offline earnings: ${formatNumber(reward)} chips!`, 'win');
+            }
+        }
+    } catch (error) {
+        console.error('Load failed:', error);
+        syncTempoStats();
+    }
+}
+
+/* =========================================================
+   KEYBOARD
+========================================================= */
+
+const keyMap = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3 };
+
+document.addEventListener('keydown', event => {
+    if (event.code in keyMap && !event.repeat) {
+        event.preventDefault();
+        handleKeyDown(keyMap[event.code]);
+    }
+});
+
+document.addEventListener('keyup', event => {
+    if (event.code in keyMap) {
+        event.preventDefault();
+        handleKeyUp(keyMap[event.code]);
+    }
+});
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden && state.isPlaying) {
+        finishGame(false, 'Stage abandoned!');
+    }
+});
+
+window.addEventListener('beforeunload', saveGame);
+
+/* =========================================================
+   START
+========================================================= */
+
+loadGame();
+state.lastTick = performance.now();
+updateUI();
+requestAnimationFrame(gameLoop);
