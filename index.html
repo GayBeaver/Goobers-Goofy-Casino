@@ -2,9 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#07090c">
-    <title>All-In Crescendo</title>
+    <title>Goobers Goofy Casino</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,9 +17,9 @@
 
     <header class="topbar">
         <div class="brand-lockup">
-            <span class="brand-mark">AIC</span>
+            <span class="brand-mark">GGC</span>
             <div>
-                <strong>ALL-IN CRESCENDO</strong>
+                <strong>GOOBERS GOOFY CASINO</strong>
                 <span>CASINO TYCOON · RHYTHM ROGUELITE</span>
             </div>
         </div>
@@ -37,11 +40,17 @@
         </div>
     </header>
 
+    <nav class="mobile-nav" id="mobileNav" aria-label="Mobile game sections">
+        <button type="button" data-scroll-target="showControlPanel">SETUP</button>
+        <button type="button" data-scroll-target="rhythmStage" class="active">STAGE</button>
+        <button type="button" data-scroll-target="casinoPanel">CASINO</button>
+    </nav>
+
     <div class="game-shell" id="gameShell">
         <!-- =====================================================
              LEFT — CASINO TYCOON
         ====================================================== -->
-        <aside class="panel casino-panel">
+        <aside class="panel casino-panel" id="casinoPanel">
             <div class="panel-heading">
                 <div>
                     <span class="eyebrow">YOUR EMPIRE</span>
@@ -150,11 +159,11 @@
         <!-- =====================================================
              CENTER — RHYTHM STAGE
         ====================================================== -->
-        <main class="rhythm-center">
+        <main class="rhythm-center" id="rhythmStage">
             <div class="rhythm-header">
                 <div>
                     <span class="eyebrow">LIVE SHOW</span>
-                    <h1>All-In Crescendo</h1>
+                    <h1>Goobers Goofy Casino</h1>
                 </div>
                 <div class="key-guide" aria-label="Controls">
                     <kbd>D</kbd><kbd>F</kbd><kbd>J</kbd><kbd>K</kbd>
@@ -233,7 +242,7 @@
         <!-- =====================================================
              RIGHT — SHOW PREPARATION
         ====================================================== -->
-        <aside class="panel rhythm-control-panel">
+        <aside class="panel rhythm-control-panel" id="showControlPanel">
             <div class="panel-heading">
                 <div>
                     <span class="eyebrow">THE STAGE</span>
@@ -342,6 +351,38 @@
             <button class="text-button" id="resetSaveBtn" type="button">RESET SAVE / DEVELOPMENT TOOLS</button>
         </aside>
     </div>
+
+    <!-- =====================================================
+         MOBILE PLAY DOCK
+    ====================================================== -->
+    <section class="mobile-play-dock" id="mobilePlayDock" aria-label="Mobile rhythm controls">
+        <div class="mobile-dock-summary">
+            <span id="mobileDockStatus">READY</span>
+            <strong id="mobileDockValue">0 CHIPS</strong>
+        </div>
+
+        <div class="mobile-idle-actions" id="mobileIdleActions">
+            <button type="button" class="mobile-setup-button" id="mobileSetupBtn">SHOW SETUP</button>
+            <button type="button" class="mobile-start-button" id="mobileStartBtn">START SHOW</button>
+        </div>
+
+        <div class="mobile-live-actions hidden" id="mobileLiveActions">
+            <button type="button" class="mobile-fever-button" id="mobileFeverBtn" disabled>FEVER</button>
+            <button type="button" class="mobile-cash-button" id="mobileCashOutBtn">CASH OUT</button>
+        </div>
+
+        <div class="mobile-encore-actions hidden" id="mobileEncoreActions">
+            <button type="button" class="mobile-cash-button" id="mobileEncoreCashOutBtn">BANK POT</button>
+            <button type="button" class="mobile-encore-button" id="mobileAcceptEncoreBtn">PLAY ENCORE</button>
+        </div>
+
+        <div class="mobile-lane-controls hidden" id="mobileLaneControls" aria-label="Touch note buttons">
+            <button type="button" data-mobile-lane="0" aria-label="Lane D">D</button>
+            <button type="button" data-mobile-lane="1" aria-label="Lane F">F</button>
+            <button type="button" data-mobile-lane="2" aria-label="Lane J">J</button>
+            <button type="button" data-mobile-lane="3" aria-label="Lane K">K</button>
+        </div>
+    </section>
 
     <!-- =====================================================
          MANAGER MODAL
