@@ -166,7 +166,10 @@ hr { border: 0; height: 1px; margin: 20px 0; background: rgba(255,255,255,0.08);
 /* HUD */
 .performance-hud { display: grid; grid-template-columns: 105px 1fr; gap: 8px; margin-bottom: 9px; }
 .combo-card, .multiplier-card { background: #111519; border: 1px solid var(--border-bright); border-radius: 10px; }
-.combo-card { min-height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.combo-card { min-height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
+.lives-row { display: flex; gap: 4px; margin-bottom: 2px; }
+.life-pip { width: 8px; height: 8px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 6px rgba(255,55,111,0.6); transition: 0.2s; }
+.life-pip.lost { background: #2a2f34; box-shadow: none; }
 .hud-label { color: #697278; font-size: 8px; font-weight: 900; letter-spacing: 1px; }
 #comboDisplay { color: #fff; font-size: 34px; }
 .best-combo { color: #596168; font-size: 8px; }
