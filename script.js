@@ -64,7 +64,7 @@ const UI_UPDATE_INTERVAL = 1 / 15;
 // =========================================================
 const ESCALATION_COMBO_STEP = 8;
 const ESCALATION_MAX_STEPS = 12;
-const ESCALATION_SPEED_STEP = 0.05;
+const ESCALATION_SPEED_STEP = 0.03;
 const ESCALATION_SPAWN_STEP = 0.06;
 const BUST_FORFEIT_RATE = 0.5;
 
@@ -88,15 +88,17 @@ const state = {
     isPlaying: false,
     wager: 0,
     showEarnings: 0,
+    livesMax: 3,
+    lives: 3,
     notes: [],
     spawnTimer: 0,
     spawnInterval: 1.2,
     holdRewardPerSecond: 10,
     combo: 0,
     bestCombo: 0,
-    targetStart: 500,
+    targetStart: 470,
     targetEnd: 560,
-    missThreshold: 570,
+    missThreshold: 575,
     keysHeld: [false, false, false, false],
     activeHoldNote: [null, null, null, null],
 
@@ -288,6 +290,7 @@ const ui = {
     message: document.getElementById('message'),
     wagerInput: document.getElementById('wager'),
     comboCard: document.getElementById('comboCard'),
+    lifePips: [...document.querySelectorAll('.life-pip')],
     comboDisplay: document.getElementById('comboDisplay'),
     bestCombo: document.getElementById('bestCombo'),
     comboMultiplier: document.getElementById('comboMultiplier'),
@@ -560,6 +563,7 @@ function sellCasino() {
     state.chips = 0;
     state.runChipsEarned = 0;
     state.combo = 0;
+    state.lives = state.livesMax;
     state.jackpot = 0;
     state.feverActive = false;
     state.feverTimeRemaining = 0;
@@ -574,6 +578,7 @@ function sellCasino() {
     }
 
     ui.startBtn.disabled = false;
+    ui.cashOutBtn.disabled = true;
     showJudgement(`+${fameGain} FAME`, 'milestone');
     showMessage(`Casino sold! Permanent multiplier is now x${getFameMultiplier()}.`, 'win');
     updateUI();
@@ -670,14 +675,19 @@ function buyUpgrade(type) {
    HIT JUDGEMENT
 ========================================================= */
 
+// Bug fix / rebalance: these bands were tuned for the old 60px hit
+// window (targetStart=500). With the window widened to 90px for a more
+// forgiving feel, PERFECT/GREAT are widened to match — otherwise the
+// window would be more forgiving overall but PERFECT would stay just
+// as unforgiving as before.
 function getHitJudgement(noteCenter) {
     const targetCenter = (state.targetStart + state.targetEnd) / 2;
     const distance = Math.abs(noteCenter - targetCenter);
 
-    if (distance <= 8) {
+    if (distance <= 15) {
         return { label: 'PERFECT', className: 'perfect', rewardMultiplier: 1.25, color: '#ffd86b', particles: 20, shake: 'medium', jackpot: 10 };
     }
-    if (distance <= 20) {
+    if (distance <= 35) {
         return { label: 'GREAT', className: 'great', rewardMultiplier: 1.1, color: '#24dfff', particles: 14, shake: 'small', jackpot: 4 };
     }
     return { label: 'GOOD', className: 'good', rewardMultiplier: 1, color: '#18f28b', particles: 10, shake: 'small', jackpot: 1 };
@@ -801,8 +811,12 @@ function gameLoop(currentTick) {
 
             if (!note.hit && note.y > state.missThreshold) {
                 cleanupNoteCompletely(i);
-                finishGame(false, 'Note missed!');
-                break;
+                // loseLife() only calls finishGame() (which clears
+                // state.notes entirely) when lives hit 0 — only break
+                // out of this loop in that case. Otherwise the show is
+                // still running with other notes in flight, so keep
+                // iterating normally.
+                if (loseLife('Note missed!')) break;
             }
         }
     }
@@ -935,7 +949,12 @@ function handleKeyDown(laneIndex) {
     } else if (center < state.targetStart) {
         state.combo = 0;
     } else {
-        finishGame(false, 'Too late!');
+        // Bug fix: clean the note up here before docking a life —
+        // otherwise it stays in state.notes un-hit, crosses
+        // missThreshold moments later, and the gameLoop miss-check
+        // would dock a second life for the same physical note.
+        cleanupNoteCompletely(index);
+        loseLife('Too late!');
     }
 }
 
@@ -946,7 +965,7 @@ function handleKeyUp(laneIndex) {
     const index = state.notes.findIndex(n => n.id === note.id);
     if (index !== -1) {
         cleanupNoteCompletely(index);
-        finishGame(false, 'Released too early!');
+        loseLife('Released too early!');
     }
 }
 
@@ -976,6 +995,7 @@ function startConcert() {
     state.chips -= wager;
     state.wager = wager;
     state.showEarnings = 0;
+    state.lives = state.livesMax;
     state.combo = 0;
     state.spawnTimer = 0;
     clearAllNotes();
@@ -985,6 +1005,30 @@ function startConcert() {
 
     showJudgement('READY', 'good');
     showMessage(`Show started at Tempo ${state.tempo.activeLevel}!`, 'win');
+}
+
+// A single miss no longer ends the show outright — it costs a life
+// (and your combo, which also cools HEAT back down, giving you room
+// to recover). The show only ends once lives run out. Returns true if
+// this loss emptied your lives and ended the show, so callers that are
+// mid-loop (the miss check in gameLoop) know whether it's safe to keep
+// iterating over state.notes or whether it's just been cleared out from
+// under them.
+function loseLife(reason) {
+    state.combo = 0;
+    state.lives--;
+
+    if (state.lives <= 0) {
+        finishGame(false, reason);
+        return true;
+    }
+
+    showJudgement('MISS', 'miss');
+    showMessage(`${reason} ${state.lives} ${state.lives === 1 ? 'life' : 'lives'} left.`, 'lose');
+    triggerShake('small');
+    flashScreen('#ff376f');
+    updateUI();
+    return false;
 }
 
 function finishGame(won, text) {
@@ -1124,6 +1168,7 @@ function updateUI() {
     ui.idleIncome.innerText = formatNumber(idleIncome);
     ui.wagerInput.max = Math.max(1, Math.floor(state.chips));
     ui.comboDisplay.innerText = state.combo;
+    ui.lifePips.forEach((pip, idx) => pip.classList.toggle('lost', idx >= state.lives));
     ui.bestCombo.innerText = state.bestCombo;
     ui.comboMultiplier.innerText = `x${getComboMultiplier().toFixed(2)}`;
     ui.heatMultiplier.innerText = `x${getEscalationSpeedMultiplier().toFixed(2)}`;
