@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#07090c">
+    <title>All-In Crescendo</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-grid" aria-hidden="true"></div>
+    <div class="screen-flash" id="screenFlash" aria-hidden="true"></div>
+    <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+    <header class="topbar">
+        <div class="brand-lockup">
+            <span class="brand-mark">AIC</span>
+            <div>
+                <strong>ALL-IN CRESCENDO</strong>
+                <span>CASINO TYCOON · RHYTHM ROGUELITE</span>
+            </div>
+        </div>
+
+        <div class="topbar-stats">
+            <div class="top-stat">
+                <span>VENUE</span>
+                <strong id="topVenue">Backroom Stage</strong>
+            </div>
+            <div class="top-stat">
+                <span>FAME</span>
+                <strong id="topFame">0</strong>
+            </div>
+            <div class="top-stat accent">
+                <span>CHIPS</span>
+                <strong id="topChips">0</strong>
+            </div>
+        </div>
+    </header>
+
+    <div class="game-shell" id="gameShell">
+        <!-- =====================================================
+             LEFT — CASINO TYCOON
+        ====================================================== -->
+        <aside class="panel casino-panel">
+            <div class="panel-heading">
+                <div>
+                    <span class="eyebrow">YOUR EMPIRE</span>
+                    <h2>Casino Floor</h2>
+                </div>
+                <span class="rank-badge" id="rankBadge">RANK 1</span>
+            </div>
+
+            <section class="casino-scene venue-0" id="casinoScene" aria-label="Visual representation of your casino">
+                <div class="scene-sky"></div>
+                <div class="scene-building">
+                    <div class="scene-sign" id="sceneVenueName">BACKROOM</div>
+                    <div class="scene-windows" id="sceneWindows"></div>
+                    <div class="scene-door"></div>
+                </div>
+                <div class="scene-floor" id="sceneFloor"></div>
+                <div class="scene-crowd" id="sceneCrowd"></div>
+            </section>
+
+            <section class="wallet-card">
+                <div>
+                    <span>AVAILABLE CHIPS</span>
+                    <strong id="chips">0</strong>
+                </div>
+                <div class="wallet-rate">
+                    <span>PASSIVE INCOME</span>
+                    <strong><span id="idleIncome">1</span>/sec</strong>
+                </div>
+            </section>
+
+            <div class="economy-strip">
+                <div>
+                    <span>BASE CASINO</span>
+                    <strong id="baseCasinoIncome">1/sec</strong>
+                </div>
+                <div>
+                    <span>CATCH-UP</span>
+                    <strong id="catchUpDisplay">x1</strong>
+                </div>
+                <div>
+                    <span>ACHIEVEMENTS</span>
+                    <strong id="achievementBonusDisplay">x1.00</strong>
+                </div>
+            </div>
+
+            <section class="venue-card">
+                <div class="section-heading compact">
+                    <div>
+                        <span class="eyebrow">VENUE PROGRESSION</span>
+                        <h3 id="venueName">Backroom Stage</h3>
+                    </div>
+                    <span class="venue-number" id="venueNumber">01 / 07</span>
+                </div>
+
+                <p class="venue-description" id="venueDescription"></p>
+                <div class="objective-list" id="objectiveList"></div>
+
+                <button class="primary-button expansion-button" id="expandVenueBtn" type="button">
+                    <span id="expandVenueLabel">EXPAND VENUE</span>
+                    <small id="expandVenueCost">Cost: 8K</small>
+                </button>
+            </section>
+
+            <div class="section-heading buildings-heading">
+                <div>
+                    <span class="eyebrow">PASSIVE ECONOMY</span>
+                    <h3>Casino Buildings</h3>
+                </div>
+                <div class="buy-mode-row" id="buyModeRow">
+                    <button type="button" data-buy-mode="1" class="selected">1</button>
+                    <button type="button" data-buy-mode="10">10</button>
+                    <button type="button" data-buy-mode="max">MAX</button>
+                </div>
+            </div>
+
+            <div class="building-list" id="buildingList"></div>
+
+            <div class="management-grid">
+                <button class="secondary-button" id="openManagersBtn" type="button">
+                    <span>MANAGERS</span>
+                    <small id="managerCount">0 selected</small>
+                </button>
+                <button class="secondary-button fame" id="openFameBtn" type="button">
+                    <span>FAME TREE</span>
+                    <small id="fameAvailable">0 available</small>
+                </button>
+                <button class="secondary-button" id="openStatsBtn" type="button">
+                    <span>STATS</span>
+                    <small id="achievementCount">0 achievements</small>
+                </button>
+            </div>
+
+            <section class="prestige-card" id="prestigeCard">
+                <div class="prestige-heading">
+                    <div>
+                        <span class="eyebrow">PRESTIGE</span>
+                        <h3>Sell the Casino</h3>
+                    </div>
+                    <strong id="prestigeReward">+0 Fame</strong>
+                </div>
+                <p id="prestigeRequirementText">Reach the Luxury Resort, earn 100M chips this run, complete 5 contracts, and reach a 30 combo.</p>
+                <button class="gold-button" id="prestigeBtn" type="button" disabled>SELL THE CASINO</button>
+            </section>
+        </aside>
+
+        <!-- =====================================================
+             CENTER — RHYTHM STAGE
+        ====================================================== -->
+        <main class="rhythm-center">
+            <div class="rhythm-header">
+                <div>
+                    <span class="eyebrow">LIVE SHOW</span>
+                    <h1>All-In Crescendo</h1>
+                </div>
+                <div class="key-guide" aria-label="Controls">
+                    <kbd>D</kbd><kbd>F</kbd><kbd>J</kbd><kbd>K</kbd>
+                    <kbd class="wide">SPACE · CASH OUT</kbd>
+                </div>
+            </div>
+
+            <section class="jackpot-panel" id="jackpotPanel">
+                <div class="jackpot-heading">
+                    <span>JACKPOT METER</span>
+                    <strong id="jackpotText">0 / 100</strong>
+                </div>
+                <div class="jackpot-track"><div id="jackpotFill"></div></div>
+                <button id="feverBtn" class="fever-button" type="button" disabled>FEVER LOCKED · 0%</button>
+                <small>Perfect +10 · Great +4 · Good +1 · Fever triples casino income</small>
+            </section>
+
+            <section class="performance-hud">
+                <div class="hud-card lives-card">
+                    <span class="hud-label">LIVES</span>
+                    <div class="lives-row" id="livesRow"></div>
+                    <small id="showStatus">NO SHOW ACTIVE</small>
+                </div>
+                <div class="hud-card combo-card">
+                    <span class="hud-label">COMBO</span>
+                    <strong id="comboDisplay">0</strong>
+                    <small>BEST <span id="bestCombo">0</span></small>
+                </div>
+                <div class="hud-card pot-card">
+                    <span class="hud-label">SHOW POT</span>
+                    <strong id="showPotDisplay">0</strong>
+                    <small id="showProfitDisplay">+0 PROFIT</small>
+                </div>
+            </section>
+
+            <section class="multiplier-ribbon">
+                <div><span>COMBO</span><strong id="comboMultiplier">x1.00</strong></div>
+                <div><span>HEAT</span><strong id="heatMultiplier">x1.00</strong></div>
+                <div><span>CONTRACT</span><strong id="contractMultiplier">x1.00</strong></div>
+                <div class="total"><span>POT GROWTH</span><strong id="potGrowthMultiplier">x1.00</strong></div>
+            </section>
+
+            <div class="contract-progress" id="contractProgressPanel">
+                <div>
+                    <span id="activeContractName">Open Mic</span>
+                    <strong id="contractProgressText">0 / 20 hits</strong>
+                </div>
+                <div class="progress-track"><div id="contractProgressFill"></div></div>
+            </div>
+
+            <div class="highway" id="highway">
+                <div class="lane" id="lane-0"><div class="target-zone" id="target-0">D</div></div>
+                <div class="lane" id="lane-1"><div class="target-zone" id="target-1">F</div></div>
+                <div class="lane" id="lane-2"><div class="target-zone" id="target-2">J</div></div>
+                <div class="lane" id="lane-3"><div class="target-zone" id="target-3">K</div></div>
+                <div class="beat-line" id="beatLine" aria-hidden="true"></div>
+                <div id="effectsLayer"></div>
+                <div id="judgement" aria-hidden="true"></div>
+
+                <div class="encore-overlay hidden" id="encoreOverlay">
+                    <span class="eyebrow">CONTRACT COMPLETE</span>
+                    <h2>ENCORE?</h2>
+                    <p id="encoreSummary">Your pot is ready to bank.</p>
+                    <div class="encore-pot"><span>CURRENT POT</span><strong id="encorePot">0</strong></div>
+                    <div class="encore-actions">
+                        <button class="gold-button" id="encoreCashOutBtn" type="button">CASH OUT</button>
+                        <button class="danger-button" id="acceptEncoreBtn" type="button">RISK THE ENCORE</button>
+                    </div>
+                    <small id="encoreRiskText">Heat +2 · Longer set · Pot growth +50%</small>
+                </div>
+            </div>
+
+            <div class="rhythm-message" id="message" aria-live="polite">Build your casino, choose a contract, then take the stage.</div>
+        </main>
+
+        <!-- =====================================================
+             RIGHT — SHOW PREPARATION
+        ====================================================== -->
+        <aside class="panel rhythm-control-panel">
+            <div class="panel-heading">
+                <div>
+                    <span class="eyebrow">THE STAGE</span>
+                    <h2>Show Control</h2>
+                </div>
+                <button class="icon-button" id="audioToggleBtn" type="button" aria-label="Toggle audio">AUDIO ON</button>
+            </div>
+
+            <section class="control-section">
+                <div class="section-heading compact">
+                    <div>
+                        <span class="eyebrow">01 · CHOOSE A SET</span>
+                        <h3>Show Contracts</h3>
+                    </div>
+                </div>
+                <div class="contract-list" id="contractList"></div>
+            </section>
+
+            <section class="control-section wager-section">
+                <div class="section-heading compact">
+                    <div>
+                        <span class="eyebrow">02 · PLACE YOUR BET</span>
+                        <h3>Show Wager</h3>
+                    </div>
+                </div>
+                <p>Your wager becomes the starting Show Pot. It is only returned when you cash out.</p>
+                <div class="wager-input-wrap">
+                    <span>◆</span>
+                    <input type="number" id="wager" value="10" min="1" inputmode="numeric">
+                    <small>CHIPS</small>
+                </div>
+                <div class="wager-quick-row">
+                    <button type="button" data-wager-fraction="0.1">10%</button>
+                    <button type="button" data-wager-fraction="0.25">25%</button>
+                    <button type="button" data-wager-fraction="0.5">50%</button>
+                    <button type="button" data-wager-fraction="1">MAX</button>
+                </div>
+
+                <button class="primary-button start-show-button" id="startBtn" type="button">
+                    <span>START SHOW</span>
+                    <small id="startButtonSubtext">Open Mic · 3 lives</small>
+                </button>
+                <button class="gold-button cash-out-button" id="cashOutBtn" type="button" disabled>
+                    <span>CASH OUT</span>
+                    <small>Press SPACE without leaving D/F/J/K</small>
+                </button>
+            </section>
+
+            <section class="control-section">
+                <div class="section-heading compact">
+                    <div>
+                        <span class="eyebrow">03 · SET THE PACE</span>
+                        <h3>Tempo</h3>
+                    </div>
+                </div>
+
+                <button class="tempo-upgrade-card" id="tempoUpgradeBtn" type="button">
+                    <span class="tempo-icon">♪</span>
+                    <span class="tempo-copy">
+                        <strong>Unlock Higher Tempo</strong>
+                        <small>+12 speed · +0.08× pot growth</small>
+                    </span>
+                    <span class="tempo-price">
+                        <small>LV. <b id="tempoUnlockedLevel">0</b></small>
+                        <strong id="tempoUpgradeCost">250</strong>
+                    </span>
+                </button>
+
+                <div class="tempo-selector">
+                    <div class="tempo-selector-heading">
+                        <span>ACTIVE TEMPO</span>
+                        <strong id="tempoLevelDisplay">0 / 0</strong>
+                    </div>
+                    <div class="tempo-control-row">
+                        <button id="tempoDownBtn" type="button">−<small>SLOWER</small></button>
+                        <div class="tempo-current"><strong id="tempoSpeedDisplay">300</strong><small>SPEED</small></div>
+                        <button id="tempoUpBtn" type="button">+<small>FASTER</small></button>
+                    </div>
+                    <div class="tempo-meta">
+                        <span><b id="tempoBpmDisplay">96</b> BPM</span>
+                        <span><b id="tempoPayoutDisplay">x1.00</b> growth</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="control-section">
+                <div class="section-heading compact">
+                    <div>
+                        <span class="eyebrow">04 · PERFORMANCE</span>
+                        <h3>Career Snapshot</h3>
+                    </div>
+                </div>
+                <div class="rhythm-stat-grid">
+                    <div><span>Best Cashout</span><strong id="bestCashoutStat">0</strong></div>
+                    <div><span>Contracts</span><strong id="contractsStat">0</strong></div>
+                    <div><span>Perfect Hits</span><strong id="perfectHitsStat">0</strong></div>
+                    <div><span>Encores</span><strong id="encoresStat">0</strong></div>
+                </div>
+            </section>
+
+            <div class="tip-card">
+                <strong>HOUSE ADVICE</strong>
+                <p>Heat increases difficulty and pot growth. Contracts end with an Encore decision. Cashing out is progress; greed is optional.</p>
+            </div>
+
+            <button class="text-button" id="resetSaveBtn" type="button">RESET SAVE / DEVELOPMENT TOOLS</button>
+        </aside>
+    </div>
+
+    <!-- =====================================================
+         MANAGER MODAL
+    ====================================================== -->
+    <div class="modal-backdrop hidden" id="managersModal" role="dialog" aria-modal="true" aria-labelledby="managersTitle">
+        <div class="modal-window wide-modal">
+            <div class="modal-heading">
+                <div><span class="eyebrow">RUN-SPECIFIC SPECIALISTS</span><h2 id="managersTitle">Casino Managers</h2></div>
+                <button class="modal-close" type="button" data-close-modal="managersModal">×</button>
+            </div>
+            <p class="modal-intro">Each manager offers one permanent choice for the current casino run. Managers reset when you sell the casino.</p>
+            <div class="manager-list" id="managerList"></div>
+        </div>
+    </div>
+
+    <!-- =====================================================
+         FAME TREE MODAL
+    ====================================================== -->
+    <div class="modal-backdrop hidden" id="fameModal" role="dialog" aria-modal="true" aria-labelledby="fameTitle">
+        <div class="modal-window fame-modal-window">
+            <div class="modal-heading">
+                <div><span class="eyebrow">PERMANENT PRESTIGE UPGRADES</span><h2 id="fameTitle">Fame Tree</h2></div>
+                <div class="modal-heading-actions"><strong id="modalFameAvailable">0 FAME</strong><button class="modal-close" type="button" data-close-modal="fameModal">×</button></div>
+            </div>
+            <p class="modal-intro">Fame upgrades survive every casino sale. They create different builds instead of one runaway global multiplier.</p>
+            <div class="fame-tree" id="fameTree"></div>
+        </div>
+    </div>
+
+    <!-- =====================================================
+         STATS + ACHIEVEMENTS MODAL
+    ====================================================== -->
+    <div class="modal-backdrop hidden" id="statsModal" role="dialog" aria-modal="true" aria-labelledby="statsTitle">
+        <div class="modal-window wide-modal">
+            <div class="modal-heading">
+                <div><span class="eyebrow">CAREER RECORD</span><h2 id="statsTitle">Stats & Achievements</h2></div>
+                <button class="modal-close" type="button" data-close-modal="statsModal">×</button>
+            </div>
+            <div class="career-stats" id="careerStats"></div>
+            <h3 class="modal-subheading">Achievements</h3>
+            <div class="achievement-list" id="achievementList"></div>
+        </div>
+    </div>
+
+    <!-- =====================================================
+         RESET MODAL
+    ====================================================== -->
+    <div class="modal-backdrop hidden" id="resetModal" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
+        <div class="modal-window small-modal">
+            <div class="modal-heading">
+                <div><span class="eyebrow">DEVELOPMENT TOOLS</span><h2 id="resetTitle">Save Management</h2></div>
+                <button class="modal-close" type="button" data-close-modal="resetModal">×</button>
+            </div>
+            <p class="modal-intro">This update uses a new save version, so older builds do not overwrite the rebalanced economy.</p>
+            <button class="danger-button full-width" id="confirmResetBtn" type="button">DELETE THIS BROWSER'S SAVE</button>
+            <button class="secondary-button full-width" id="exportSaveBtn" type="button">COPY SAVE TO CLIPBOARD</button>
+            <button class="secondary-button full-width" id="importSaveBtn" type="button">IMPORT SAVE FROM PROMPT</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
