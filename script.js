@@ -1,7 +1,7 @@
 'use strict';
 
 /* =========================================================
-   ALL-IN CRESCENDO — LONG-FORM TYCOON / RHYTHM ROGUELITE
+   GOOBERS GOOFY CASINO — LONG-FORM TYCOON / RHYTHM ROGUELITE
 
    This build intentionally uses a new save key. The economy,
    prestige model and rhythm payouts are incompatible with the
@@ -9,8 +9,9 @@
    start without requiring them to clear browser storage.
 ========================================================= */
 
-const SAVE_KEY = 'allInCrescendoSave_v6';
-const SAVE_VERSION = 6;
+const SAVE_KEY = 'goobersGoofyCasinoSave_v7';
+const LEGACY_SAVE_KEYS = ['allInCrescendoSave_v6'];
+const SAVE_VERSION = 7;
 const OFFLINE_CAP_SECONDS = 8 * 60 * 60;
 const OFFLINE_EFFICIENCY = 0.5;
 const SAVE_INTERVAL = 15;
@@ -18,8 +19,8 @@ const UI_INTERVAL = 1 / 12;
 
 const LANE_COUNT = 4;
 const NOTE_SPAWN_Y = -34;
-const TARGET_CENTER_Y = 536;
-const MISS_Y = 585;
+let TARGET_CENTER_Y = 536;
+let MISS_Y = 585;
 const PERFECT_WINDOW = 0.055;
 const GREAT_WINDOW = 0.105;
 const GOOD_WINDOW = 0.18;
@@ -526,7 +527,9 @@ function createDefaultState() {
             saveTimer: 0,
             uiTimer: 0,
             sceneDirty: true,
-            contentDirty: true
+            contentDirty: true,
+            visibilityPaused: false,
+            visibilityPausedAt: 0
         }
     };
 }
@@ -642,7 +645,26 @@ const ui = {
     exportSaveBtn: document.getElementById('exportSaveBtn'),
     importSaveBtn: document.getElementById('importSaveBtn'),
     encoreCashOutBtn: document.getElementById('encoreCashOutBtn'),
-    acceptEncoreBtn: document.getElementById('acceptEncoreBtn')
+    acceptEncoreBtn: document.getElementById('acceptEncoreBtn'),
+
+    casinoPanel: document.getElementById('casinoPanel'),
+    rhythmStage: document.getElementById('rhythmStage'),
+    showControlPanel: document.getElementById('showControlPanel'),
+    mobileNav: document.getElementById('mobileNav'),
+    mobilePlayDock: document.getElementById('mobilePlayDock'),
+    mobileDockStatus: document.getElementById('mobileDockStatus'),
+    mobileDockValue: document.getElementById('mobileDockValue'),
+    mobileIdleActions: document.getElementById('mobileIdleActions'),
+    mobileLiveActions: document.getElementById('mobileLiveActions'),
+    mobileEncoreActions: document.getElementById('mobileEncoreActions'),
+    mobileLaneControls: document.getElementById('mobileLaneControls'),
+    mobileSetupBtn: document.getElementById('mobileSetupBtn'),
+    mobileStartBtn: document.getElementById('mobileStartBtn'),
+    mobileFeverBtn: document.getElementById('mobileFeverBtn'),
+    mobileCashOutBtn: document.getElementById('mobileCashOutBtn'),
+    mobileEncoreCashOutBtn: document.getElementById('mobileEncoreCashOutBtn'),
+    mobileAcceptEncoreBtn: document.getElementById('mobileAcceptEncoreBtn'),
+    mobileLaneButtons: Array.from(document.querySelectorAll('[data-mobile-lane]'))
 };
 
 const buildingRefs = new Map();
@@ -651,6 +673,111 @@ const contractRefs = new Map();
 /* =========================================================
    UTILITIES
 ========================================================= */
+
+function isMobileLayout() {
+    return window.matchMedia('(max-width: 850px)').matches;
+}
+
+function refreshHighwayMetrics() {
+    if (!ui.highway || !ui.targets[0]) return;
+    const target = ui.targets[0];
+    const highwayHeight = ui.highway.clientHeight || 610;
+    TARGET_CENTER_Y = target.offsetTop + target.offsetHeight / 2;
+    MISS_Y = Math.max(TARGET_CENTER_Y + 30, highwayHeight - 22);
+}
+
+function scrollToGameSection(element, behavior = 'smooth') {
+    if (!element) return;
+    element.scrollIntoView({ behavior, block: 'start' });
+}
+
+function focusStageOnMobile() {
+    if (!isMobileLayout()) return;
+
+    window.setTimeout(() => {
+        refreshHighwayMetrics();
+        const dockRect = ui.mobilePlayDock.getBoundingClientRect();
+        const highwayRect = ui.highway.getBoundingClientRect();
+        const visibleBottom = dockRect.top - 8;
+        const nextScrollTop = Math.max(0, window.scrollY + highwayRect.bottom - visibleBottom);
+        setActiveMobileNav('rhythmStage');
+        window.scrollTo({ top: nextScrollTop, behavior: 'smooth' });
+    }, 90);
+}
+
+function setActiveMobileNav(targetId) {
+    if (!ui.mobileNav) return;
+    for (const button of ui.mobileNav.querySelectorAll('[data-scroll-target]')) {
+        button.classList.toggle('active', button.dataset.scrollTarget === targetId);
+    }
+}
+
+function updateMobileUI() {
+    if (!ui.mobilePlayDock) return;
+
+    const active = state.show.active;
+    const encore = active && state.show.awaitingEncore;
+    const contract = getCurrentContract();
+    const wagerValue = Number.parseInt(ui.wagerInput.value, 10);
+    const invalidWager = !Number.isFinite(wagerValue) || wagerValue <= 0 || wagerValue > state.chips;
+    const canStart = !active && !invalidWager && state.tempo.activeLevel >= contract.minTempo;
+
+    document.body.classList.toggle('mobile-show-active', active);
+    ui.mobileIdleActions.classList.toggle('hidden', active);
+    ui.mobileLiveActions.classList.toggle('hidden', !active || encore);
+    ui.mobileEncoreActions.classList.toggle('hidden', !encore);
+    ui.mobileLaneControls.classList.toggle('hidden', !active || encore || state.show.paused);
+
+    if (encore) {
+        ui.mobileDockStatus.textContent = 'ENCORE DECISION';
+        ui.mobileDockValue.textContent = `${formatNumber(state.show.pot)} POT`;
+    } else if (active) {
+        ui.mobileDockStatus.textContent = `${contract.name.toUpperCase()} · ${state.show.lives} LIFE${state.show.lives === 1 ? '' : 'S'}`;
+        ui.mobileDockValue.textContent = `${formatNumber(state.show.pot)} POT`;
+    } else {
+        ui.mobileDockStatus.textContent = `${contract.name.toUpperCase()} · TEMPO ${contract.minTempo}+`;
+        ui.mobileDockValue.textContent = `${formatNumber(state.chips)} CHIPS`;
+    }
+
+    ui.mobileStartBtn.disabled = !canStart;
+    ui.mobileStartBtn.textContent = `START ${contract.name.toUpperCase()}`;
+    ui.mobileCashOutBtn.disabled = !active || encore;
+    ui.mobileFeverBtn.disabled = ui.feverBtn.disabled;
+    ui.mobileFeverBtn.textContent = state.feverActive
+        ? `FEVER ${state.feverRemaining.toFixed(1)}s`
+        : state.jackpot >= state.jackpotMax
+            ? 'ACTIVATE FEVER'
+            : `FEVER ${Math.floor(clamp(state.jackpot / state.jackpotMax, 0, 1) * 100)}%`;
+}
+
+function pauseShowForVisibility() {
+    if (!state.show.active || state.show.paused || state.runtime.visibilityPaused) return;
+    state.runtime.visibilityPaused = true;
+    state.runtime.visibilityPausedAt = getNowSeconds();
+    state.show.paused = true;
+    if (audioEngine.context?.state === 'running') audioEngine.context.suspend().catch(() => {});
+}
+
+function resumeShowFromVisibility() {
+    if (!state.runtime.visibilityPaused || !state.show.active) return;
+    const now = getNowSeconds();
+    const shift = Math.max(0, now - state.runtime.visibilityPausedAt);
+
+    state.show.nextHitTime += shift;
+    state.show.startedAt += shift;
+    state.show.laneBusyUntil = state.show.laneBusyUntil.map(time => time > 0 ? time + shift : 0);
+    for (const note of state.show.notes) {
+        note.hitTime += shift;
+        note.spawnTime += shift;
+    }
+
+    state.runtime.visibilityPaused = false;
+    state.runtime.visibilityPausedAt = 0;
+    state.show.paused = false;
+    audioEngine.ensure();
+    showMessage('Show resumed after the interruption.', 'win');
+    updateUI(true);
+}
 
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -1404,6 +1531,7 @@ function startShow() {
     showJudgement('READY', 'good');
     showMessage(`${contract.name} started. Your ${formatNumber(wager)}-chip wager is now unbanked.`, 'win');
     updateUI(true);
+    focusStageOnMobile();
 }
 
 function calculateHitPotGain(note, quality, isHold = false) {
@@ -2318,7 +2446,11 @@ function updateUI(force = false) {
     ui.perfectHitsStat.textContent = formatNumber(state.stats.perfectHits);
     ui.encoresStat.textContent = formatNumber(state.stats.encores);
 
-    if (force) state.runtime.uiTimer = 0;
+    updateMobileUI();
+    if (force) {
+        state.runtime.uiTimer = 0;
+        refreshHighwayMetrics();
+    }
 }
 
 /* =========================================================
@@ -2379,13 +2511,14 @@ async function exportSave() {
 }
 
 function importSave() {
-    const raw = window.prompt('Paste a v6 save string:');
+    const raw = window.prompt('Paste a Goobers Goofy Casino save string:');
     if (!raw) return;
     try {
         const parsed = JSON.parse(raw);
-        if (parsed.version !== SAVE_VERSION) throw new Error('Wrong save version');
+        if (![SAVE_VERSION, 6].includes(parsed.version)) throw new Error('Wrong save version');
         if (!persistenceAvailable) throw new Error('Browser storage is unavailable');
-        localStorage.setItem(SAVE_KEY, raw);
+        parsed.version = SAVE_VERSION;
+        localStorage.setItem(SAVE_KEY, JSON.stringify(parsed));
         suppressSave = true;
         location.reload();
     } catch (error) {
@@ -2394,11 +2527,14 @@ function importSave() {
 }
 
 function resetSave() {
-    const confirmed = window.confirm('Delete all All-In Crescendo progress from this browser? This cannot be undone.');
+    const confirmed = window.confirm('Delete all Goobers Goofy Casino progress from this browser? This cannot be undone.');
     if (!confirmed) return;
     suppressSave = true;
     try {
-        if (persistenceAvailable) localStorage.removeItem(SAVE_KEY);
+        if (persistenceAvailable) {
+            localStorage.removeItem(SAVE_KEY);
+            for (const legacyKey of LEGACY_SAVE_KEYS) localStorage.removeItem(legacyKey);
+        }
     } catch {
         persistenceAvailable = false;
     }
@@ -2481,9 +2617,21 @@ function mergeLoadedState(save) {
 }
 
 function loadGame() {
-    let raw;
+    let raw = null;
+    let migratedLegacySave = false;
+
     try {
         raw = localStorage.getItem(SAVE_KEY);
+        if (!raw) {
+            for (const legacyKey of LEGACY_SAVE_KEYS) {
+                const candidate = localStorage.getItem(legacyKey);
+                if (candidate) {
+                    raw = candidate;
+                    migratedLegacySave = true;
+                    break;
+                }
+            }
+        }
     } catch (error) {
         persistenceAvailable = false;
         console.warn('Persistent browser storage is unavailable; the game will still run for this session.', error);
@@ -2493,7 +2641,7 @@ function loadGame() {
 
     try {
         const save = JSON.parse(raw);
-        if (save.version !== SAVE_VERSION) return;
+        if (![SAVE_VERSION, 6].includes(save.version)) return;
         state = mergeLoadedState(save);
 
         const secondsAway = clamp((Date.now() - (save.savedAt || Date.now())) / 1000, 0, OFFLINE_CAP_SECONDS);
@@ -2503,6 +2651,8 @@ function loadGame() {
             addChips(reward, true);
             showToast(`Offline earnings: ${formatNumber(reward)} chips (${Math.round(secondsAway / 60)} min at 50% efficiency)`, 'gold');
         }
+
+        if (migratedLegacySave || save.version !== SAVE_VERSION) saveGame();
     } catch (error) {
         console.error('Load failed:', error);
     }
@@ -2656,6 +2806,65 @@ document.addEventListener('click', event => {
     if (event.target.classList.contains('modal-backdrop')) closeModal(event.target);
 });
 
+ui.mobileNav?.addEventListener('click', event => {
+    const button = event.target.closest('[data-scroll-target]');
+    if (!button) return;
+    const target = document.getElementById(button.dataset.scrollTarget);
+    setActiveMobileNav(button.dataset.scrollTarget);
+    scrollToGameSection(target);
+});
+
+ui.mobileSetupBtn?.addEventListener('click', () => {
+    setActiveMobileNav('showControlPanel');
+    scrollToGameSection(ui.showControlPanel);
+});
+
+ui.mobileStartBtn?.addEventListener('click', startShow);
+ui.mobileCashOutBtn?.addEventListener('click', cashOutShow);
+ui.mobileFeverBtn?.addEventListener('click', activateFever);
+ui.mobileEncoreCashOutBtn?.addEventListener('click', cashOutShow);
+ui.mobileAcceptEncoreBtn?.addEventListener('click', acceptEncore);
+
+function bindPointerLaneControl(element, laneIndex) {
+    if (!element) return;
+    element.addEventListener('contextmenu', event => event.preventDefault());
+    element.addEventListener('pointerdown', event => {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        event.preventDefault();
+        element.setPointerCapture?.(event.pointerId);
+        element.classList.add('pressed');
+        handleLanePress(laneIndex);
+    });
+
+    const release = event => {
+        event.preventDefault();
+        element.classList.remove('pressed');
+        handleLaneRelease(laneIndex);
+    };
+
+    element.addEventListener('pointerup', release);
+    element.addEventListener('pointercancel', release);
+    element.addEventListener('lostpointercapture', () => element.classList.remove('pressed'));
+}
+
+for (const button of ui.mobileLaneButtons) {
+    bindPointerLaneControl(button, Number(button.dataset.mobileLane));
+}
+
+const mobileSectionObserver = 'IntersectionObserver' in window
+    ? new IntersectionObserver(entries => {
+        if (!isMobileLayout()) return;
+        const visible = entries
+            .filter(entry => entry.isIntersecting)
+            .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visible?.target?.id) setActiveMobileNav(visible.target.id);
+    }, { rootMargin: '-20% 0px -55% 0px', threshold: [0.1, 0.35, 0.6] })
+    : null;
+
+if (mobileSectionObserver) {
+    [ui.showControlPanel, ui.rhythmStage, ui.casinoPanel].forEach(section => section && mobileSectionObserver.observe(section));
+}
+
 const keyMap = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3 };
 
 document.addEventListener('keydown', event => {
@@ -2689,26 +2898,21 @@ document.addEventListener('keyup', event => {
 });
 
 ui.lanes.forEach((laneElement, laneIndex) => {
-    laneElement.addEventListener('pointerdown', event => {
-        if (event.pointerType === 'mouse' && event.button !== 0) return;
-        event.preventDefault();
-        laneElement.setPointerCapture?.(event.pointerId);
-        handleLanePress(laneIndex);
-    });
-
-    const release = event => {
-        event.preventDefault();
-        handleLaneRelease(laneIndex);
-    };
-    laneElement.addEventListener('pointerup', release);
-    laneElement.addEventListener('pointercancel', release);
+    bindPointerLaneControl(laneElement, laneIndex);
 });
 
 document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) return;
-    if (state.show.active) bustShow('The stage was abandoned.');
-    saveGame();
+    if (document.hidden) {
+        pauseShowForVisibility();
+        saveGame();
+        return;
+    }
+
+    resumeShowFromVisibility();
 });
+
+window.addEventListener('resize', () => window.requestAnimationFrame(refreshHighwayMetrics));
+window.addEventListener('orientationchange', () => window.setTimeout(refreshHighwayMetrics, 120));
 
 window.addEventListener('beforeunload', saveGame);
 
@@ -2722,6 +2926,7 @@ state.runtime.lastTick = performance.now();
 state.runtime.contentDirty = true;
 state.runtime.sceneDirty = true;
 renderContent();
+refreshHighwayMetrics();
 checkAchievements();
 updateUI(true);
 requestAnimationFrame(gameLoop);
